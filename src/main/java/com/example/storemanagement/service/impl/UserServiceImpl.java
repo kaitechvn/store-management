@@ -1,25 +1,30 @@
 package com.example.storemanagement.service.impl;
 
 import com.example.storemanagement.dto.request.CreateUserRequest;
+import com.example.storemanagement.dto.request.SearchUserRequest;
 import com.example.storemanagement.dto.request.UpdateUserRequest;
+import com.example.storemanagement.dto.request.pagination.BasePagination;
 import com.example.storemanagement.dto.response.UserResponse;
 import com.example.storemanagement.exception.DuplicateResourceException;
-import com.example.storemanagement.exception.ExceptionCode;
+import com.example.storemanagement.exception.SystemException;
 import com.example.storemanagement.service.UserService;
 import com.example.storemanagement.utils.KeycloakUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
-import static com.example.storemanagement.exception.ExceptionCode.EMAIL_EXISTED;
-import static com.example.storemanagement.exception.ExceptionCode.USER_EXISTED;
+import static com.example.storemanagement.exception.ExceptionCode.*;
 
 @Service
 @RequiredArgsConstructor
@@ -69,7 +74,21 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public void deleteUser(UUID userId) {
-        // TODO document why this method is empty
+        return null;
+    }
+
+    @Override
+    public BasePagination<UserResponse> searchUser(SearchUserRequest request) {
+        String userUrl = keycloakUrl + realm + "/users";
+        String accessToken = keycloakUtils.getAdminAccessToken();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(accessToken);
+
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+
+        ResponseEntity<String> response = restTemplate.getForEntity(userUrl, entity, String.class);
     }
 
     private String createKeycloakUser(CreateUserRequest request, String accessToken) throws JsonProcessingException {
@@ -110,9 +129,9 @@ public class UserServiceImpl implements UserService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(accessToken);
 
-        List<Map<String, Object>> rolesArray = new ArrayList<>();
+        List<JsonNode> rolesArray = new ArrayList<>();
         for (UUID roleId : roleIds) {
-            Map<String, Object> roleDetails = getRoleById(roleId, accessToken);
+            JsonNode roleDetails = getRoleById(roleId, accessToken);
             rolesArray.add(roleDetails);
         }
 
@@ -130,45 +149,48 @@ public class UserServiceImpl implements UserService {
 
         HttpEntity<String> entity = new HttpEntity<>(headers);
 
-        ResponseEntity<List> response = restTemplate.exchange(rolesUrl, HttpMethod.GET, entity, List.class);
-        List<Map<String, Object>> roles = Objects.requireNonNull(response.getBody());
+        ResponseEntity<List<JsonNode>> response = restTemplate.exchange(rolesUrl, HttpMethod.GET, entity, new ParameterizedTypeReference<>() {});
+        List<JsonNode> roles = Objects.requireNonNull(response.getBody());
+
+        Map<String, String> roleIdNameMap = roles.stream()
+                .collect(Collectors.toMap(
+                        r -> r.get("id").asText(),
+                        r -> r.get("name").asText()
+                ));
 
         return roleIds.stream()
-            .map(roleId -> {
-                for (Map<String, Object> role : roles) {
-                    if (roleId.toString().equals(role.get("id"))) {
-                        return (String) role.get("name");
-                    }
-                }
-                return null;
-            })
-            .filter(Objects::nonNull)
-            .toList();
+                .map(id -> roleIdNameMap.get(id.toString()))
+                .filter(Objects::nonNull)
+                .toList();
     }
 
-    private Map getRoleById(UUID roleId, String accessToken) {
+    private JsonNode getRoleById(UUID roleId, String accessToken) {
         String roleByIdUrl = keycloakUrl + realm + "/roles-by-id/" + roleId;
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(accessToken);
 
         HttpEntity<String> entity = new HttpEntity<>(headers);
-        ResponseEntity<Map> response = restTemplate.exchange(roleByIdUrl, HttpMethod.GET, entity, Map.class);
+        ResponseEntity<JsonNode> response = restTemplate.exchange(
+                roleByIdUrl,
+                HttpMethod.GET,
+                entity,
+                JsonNode.class
+        );
         return response.getBody();
     }
 
     private RuntimeException parseKeycloakError(Exception e) {
         String errorMessage = e.getMessage().toLowerCase();
         
-        if (errorMessage.contains("user exists") || errorMessage.contains("username")) {
-            return new com.example.storemanagement.exception.DuplicateResourceException(USER_EXISTED);
+        if (errorMessage.contains("same username")) {
+            return new DuplicateResourceException(USER_EXISTED);
         }
         
-        if (errorMessage.contains("email") && errorMessage.contains("exists")) {
-            return new com.example.storemanagement.exception.DuplicateResourceException(EMAIL_EXISTED);
+        if (errorMessage.contains("same email")) {
+            return new DuplicateResourceException(EMAIL_EXISTED);
         }
 
-        
-        return null;
+        return new SystemException(KEYCLOAK_FAILED);
     }
 }
