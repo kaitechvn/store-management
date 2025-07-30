@@ -1,5 +1,8 @@
 package com.example.storemanagement.exception;
 
+import lombok.Getter;
+
+@Getter
 public class DuplicateResourceException extends ApplicationException {
     private final ExceptionCode exceptionCode;
 
@@ -8,7 +11,4 @@ public class DuplicateResourceException extends ApplicationException {
         this.exceptionCode = exceptionCode;
     }
 
-    public ExceptionCode getExceptionCode() {
-        return exceptionCode;
-    }
 }

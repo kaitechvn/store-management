@@ -1,4 +1,4 @@
-package com.example.storemanagement.exception.response;
+package com.example.storemanagement.exception;
 
 import com.example.storemanagement.utils.TimeUtils;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -14,33 +14,22 @@ public class ErrorResponse {
 
     private int status;
     private String message;
-    private S
     private String path;
     private LocalDateTime timestamp;
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private List<FieldError> fieldErrors;
 
-
-    /**
-     * Static factory method to quickly create ErrorResponse.
-     */
-    public static ErrorResponse errorResponse(int status, String path, List<FieldError> fieldErrors) {
+    public static ErrorResponse errorResponse(int status, String path, String message, List<FieldError> fieldErrors) {
         return ErrorResponse.builder()
                 .status(status)
                 .path(path)
+                .message(message)
                 .timestamp(TimeUtils.getCurrentTime())
                 .fieldErrors(fieldErrors)
                 .build();
     }
 
-    /**
-     * Overload: when no field errors.
-     */
-    public static ErrorResponse errorResponse(int status, String path) {
-        return ErrorResponse.builder()
-                .status(status)
-                .path(path)
-                .timestamp(TimeUtils.getCurrentTime())
-                .build();
+    public static ErrorResponse errorResponse(int status, String path, String message) {
+        return errorResponse(status, path, message, null);
     }
 }

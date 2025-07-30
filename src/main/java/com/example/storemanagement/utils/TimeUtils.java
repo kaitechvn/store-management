@@ -6,6 +6,8 @@ import java.time.LocalDateTime;
 
 public class TimeUtils {
 
+    private TimeUtils() {}
+
     public static LocalDateTime getCurrentTime() {
         return LocalDateTime.now(Clock.systemUTC());
     }
