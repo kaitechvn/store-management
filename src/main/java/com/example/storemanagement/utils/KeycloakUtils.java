@@ -1,6 +1,10 @@
 package com.example.storemanagement.utils;
 
+import com.example.storemanagement.dto.response.UserResponse;
+import com.example.storemanagement.exception.SystemException;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
@@ -9,7 +13,11 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
+
+import static com.example.storemanagement.exception.ExceptionCode.KEYCLOAK_FAILED;
 
 @Component
 public class KeycloakUtils {
@@ -49,4 +57,14 @@ public class KeycloakUtils {
 
         return  Objects.requireNonNull(response.getBody()).get("access_token").asText();
     }
+
+    public List<UserResponse> parseUsersFromJson(String json) {
+        ObjectMapper mapper = new ObjectMapper();
+        try {
+            return Arrays.asList(mapper.readValue(json, UserResponse[].class));
+        } catch (JsonProcessingException e) {
+            throw new SystemException(KEYCLOAK_FAILED);
+        }
+    }
+
 }

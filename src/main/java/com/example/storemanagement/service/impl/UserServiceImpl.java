@@ -16,10 +16,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponents;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -69,12 +70,13 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserResponse updateUser(UpdateUserRequest request) {
+        // TO DO
         return null;
     }
 
     @Override
     public void deleteUser(UUID userId) {
-        return null;
+        // TO DO CODE
     }
 
     @Override
@@ -83,10 +85,29 @@ public class UserServiceImpl implements UserService {
         String accessToken = keycloakUtils.getAdminAccessToken();
 
         HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
+
         headers.setBearerAuth(accessToken);
 
         HttpEntity<String> entity = new HttpEntity<>(headers);
+
+
+        // Build the URI with query parameters (you can add more filters like firstName, email, etc.)
+        UriComponents builder = UriComponentsBuilder
+                .fromUriString(userUrl)
+                .queryParam("username", request.getUsername())
+                .queryParam("email", request.getUsername())
+                .queryParam("first", request.getPage() * request.getSize())
+                .queryParam("max", request.getSize())
+                .build();
+
+        String userSearchUrl = builder.toUriString();
+
+        ResponseEntity<String> response = restTemplate.exchange(
+                userSearchUrl,
+                HttpMethod.GET,
+                entity,
+                String.class
+        );
 
         ResponseEntity<String> response = restTemplate.getForEntity(userUrl, entity, String.class);
     }
